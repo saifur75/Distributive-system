@@ -1,0 +1,60 @@
+import socket
+import sys
+import time
+
+def send(sock, msg):
+    try:
+        sock.sendall((msg + "\n").encode("utf-8"))
+    except (BrokenPipeError, ConnectionResetError):
+        print("[!] Connection lost while sending:", msg)
+        sys.exit(1)
+
+def recv(sock):
+    try:
+        data = sock.recv(1024).decode("utf-8").strip()
+        if not data:
+            print("[!] Empty response or server closed connection.")
+            sys.exit(1)
+        return data
+    except (ConnectionResetError, OSError):
+        print("[!] Connection lost while receiving.")
+        sys.exit(1)
+
+def main():
+    if len(sys.argv) < 3:
+        print("Usage: python client.py <host> <port>")
+        sys.exit(1)
+
+    host = sys.argv[1]
+    port = int(sys.argv[2])
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(10)
+        print(f"[+] Connecting to {host}:{port}...")
+        sock.connect((host, port))
+        print("[+] Connected!")
+
+        # Handshake
+        send(sock, "HELO")
+        print("[Server]:", recv(sock))
+        send(sock, "AUTH syfur")
+        print("[Server]:", recv(sock))
+        time.sleep(1)
+        send(sock, "REDY")
+        print("[Server]:", recv(sock))
+
+        # Add your scheduling logic here...
+
+        send(sock, "QUIT")
+        print("[Server]:", recv(sock))
+        sock.close()
+        print("[+] Disconnected cleanly.")
+    except (ConnectionRefusedError, TimeoutError):
+        print("[!] Could not connect to the server. Make sure ds-server is running.")
+    except Exception as e:
+        print("[!] Unexpected error:", e)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
