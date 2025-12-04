@@ -1,7 +1,7 @@
 import socket
 import sys
 
-USERNAME = "48600911"  # use your MQ OneID or required username
+USERNAME = "48600911"  # your MQ OneID or required username
 
 
 def send(sock, msg: str) -> None:
@@ -28,43 +28,40 @@ def recv_line(sock) -> str:
 
 def get_all_servers(sock):
     """
-    Send GETS All, parse DATA n recLen, read n server records,
+    Send GETS All, parse DATA n recLen,
+    read exactly n server records line-by-line,
     and return the list of server lines.
     """
-    # Request server info
+    # 1) Ask for all servers
     send(sock, "GETS All")
 
-    # Example: DATA 5 123
+    # 2) Expect: DATA n recLen
     header = recv_line(sock)
     parts = header.split()
     if len(parts) < 3 or parts[0] != "DATA":
-        # Unexpected response
+        # Unexpected response, fail safely
         return []
 
     n = int(parts[1])  # number of records
 
-    # Acknowledge we're ready to receive the records
+    # 3) Acknowledge we’re ready for the records
     send(sock, "OK")
 
-    # Read n lines of server info as a batch
-    data = ""
-    while data.count("\n") < n:
-        chunk = sock.recv(4096).decode()
-        if chunk == "":
+    # 4) Read exactly n server records, one per line
+    servers = []
+    for _ in range(n):
+        line = recv_line(sock)
+        if not line:
             break
-        data += chunk
+        servers.append(line)
 
-    # Split into lines and take first n records
-    records = data.strip().split("\n")
-    records = records[:n]
-
-    # Tell server we're done reading the server list
+    # 5) Tell server we’re done reading the list
     send(sock, "OK")
 
-    # Read the '.' line from server
+    # 6) Read the '.' line from server
     _ = recv_line(sock)  # should be "."
 
-    return records
+    return servers
 
 
 def main():
